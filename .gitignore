@@ -1,0 +1,10 @@
+﻿/.vs
+/.idea
+/Build
+/bin
+/obj
+/References/*
+!References/README.md
+/release-stage
+AutoMedHotkeys-*.zip
+*.user
