@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using EFT.InventoryLogic;
-using UnityEngine;
 
 namespace AutoMedHotkeys;
 
@@ -23,11 +22,11 @@ internal static class MedHotkeyBinder
     private static int _refreshScheduled;
     private static InventoryController? _pendingController;
 
-    public static void RequestRefresh(InventoryController controller)
+    public static void RequestRefresh(InventoryController? controller)
     {
         if (!AutoMedHotkeysPlugin.Enabled.Value
             || controller == null
-            || InventoryOwnerUtil.IsObserved(controller))
+            || !InventoryOwnerUtil.IsLocalPlayerInventory(controller))
         {
             return;
         }
@@ -40,7 +39,8 @@ internal static class MedHotkeyBinder
 
         if (AutoMedHotkeysPlugin.Instance != null)
         {
-            AutoMedHotkeysPlugin.Instance.StartCoroutine(RefreshNextFrame());
+            // Two frames: move address / UI can still be mid-update on the first frame in stash.
+            AutoMedHotkeysPlugin.Instance.StartCoroutine(RefreshAfterFrames(2));
             return;
         }
 
@@ -48,9 +48,13 @@ internal static class MedHotkeyBinder
         Refresh(controller);
     }
 
-    private static IEnumerator RefreshNextFrame()
+    private static IEnumerator RefreshAfterFrames(int frames)
     {
-        yield return null;
+        for (var i = 0; i < frames; i++)
+        {
+            yield return null;
+        }
+
         RunScheduledRefresh();
     }
 
@@ -69,13 +73,14 @@ internal static class MedHotkeyBinder
     {
         if (!AutoMedHotkeysPlugin.Enabled.Value
             || controller == null
-            || InventoryOwnerUtil.IsObserved(controller))
+            || !InventoryOwnerUtil.IsLocalPlayerInventory(controller))
         {
             return;
         }
 
         try
         {
+            Log($"Refresh on {controller.GetType().Name} (OwnerType={controller.OwnerType}).");
             EnsureSlot(controller, EBoundItem.Item4, MedItemClassifier.IsMedkit, "medkit");
             EnsureSlot(controller, EBoundItem.Item5, MedItemClassifier.IsBleedStopper, "bleed-stopper");
             EnsureSlot(controller, EBoundItem.Item6, MedItemClassifier.IsBandage, "bandage");
@@ -96,29 +101,31 @@ internal static class MedHotkeyBinder
         var bound = controller.Inventory.FastAccess.GetBoundItem(slot);
         if (bound != null && match(bound) && controller.IsAtBindablePlace(bound))
         {
-            DebugLog($"Slot {slot}: keep {bound.ShortName} ({label}).");
+            Log($"Slot {slot}: keep {bound.ShortName} ({label}).");
             return;
         }
 
         if (bound != null && !AutoMedHotkeysPlugin.OverwriteExisting.Value)
         {
-            DebugLog($"Slot {slot}: occupied by {bound.ShortName}, overwrite disabled.");
+            Log($"Slot {slot}: occupied by {bound.ShortName}, overwrite disabled.");
             return;
         }
 
         var candidate = FindBestCandidate(controller, match);
         if (candidate == null)
         {
-            DebugLog($"Slot {slot}: no bindable {label} in pockets/rig.");
+            Log($"Slot {slot}: no bindable {label} in pockets/rig.");
             return;
         }
 
-        if (bound == candidate)
+        if (ReferenceEquals(bound, candidate))
         {
             return;
         }
 
-        var result = BindOperation.Run(controller, candidate, slot, true);
+        // simulate=false applies BoundItems immediately; RaiseEvents refreshes the quickbar UI;
+        // TryRunNetworkTransaction persists FastPanel to the profile.
+        var result = BindOperation.Run(controller, candidate, slot, false);
         if (!result.Succeeded)
         {
             AutoMedHotkeysPlugin.Log.LogWarning(
@@ -127,8 +134,32 @@ internal static class MedHotkeyBinder
             return;
         }
 
-        controller.TryRunNetworkTransaction(result, null);
-        DebugLog($"Slot {slot}: bound {candidate.ShortName} ({label}).");
+        try
+        {
+            result.Value.RaiseEvents(controller, CommandStatus.Begin);
+            result.Value.RaiseEvents(controller, CommandStatus.Succeed);
+        }
+        catch (Exception ex)
+        {
+            AutoMedHotkeysPlugin.Log.LogWarning(
+                $"[AutoMedHotkeys] RaiseEvents after bind failed: {ex.Message}"
+            );
+        }
+
+        try
+        {
+            controller.TryRunNetworkTransaction(result, null);
+        }
+        catch (Exception ex)
+        {
+            AutoMedHotkeysPlugin.Log.LogWarning(
+                $"[AutoMedHotkeys] TryRunNetworkTransaction after bind failed: {ex.Message}"
+            );
+        }
+
+        AutoMedHotkeysPlugin.Log.LogInfo(
+            $"[AutoMedHotkeys] Bound {candidate.ShortName} -> {slot} ({label})."
+        );
     }
 
     private static Item? FindBestCandidate(InventoryController controller, Predicate<Item> match)
@@ -136,12 +167,19 @@ internal static class MedHotkeyBinder
         var matches = new List<Item>();
         controller.GetAcceptableItemsNonAlloc(BindableEquipmentSlots, matches, match, null);
 
+        // Fallback: walk pocket/rig grids directly if the helper returned nothing.
+        if (matches.Count == 0)
+        {
+            CollectFromEquipment(controller, match, matches);
+        }
+
         Item? best = null;
         var bestScore = float.MinValue;
         foreach (var item in matches)
         {
             if (!controller.IsAtBindablePlace(item))
             {
+                Log($"Skip {item.ShortName}: not at bindable place.");
                 continue;
             }
 
@@ -156,7 +194,43 @@ internal static class MedHotkeyBinder
         return best;
     }
 
-    private static void DebugLog(string message)
+    private static void CollectFromEquipment(
+        InventoryController controller,
+        Predicate<Item> match,
+        List<Item> output
+    )
+    {
+        var equipment = controller.Inventory?.Equipment;
+        if (equipment == null)
+        {
+            return;
+        }
+
+        foreach (var slotType in BindableEquipmentSlots)
+        {
+            var slot = equipment.GetSlot(slotType);
+            var container = slot?.ContainedItem;
+            if (container == null)
+            {
+                continue;
+            }
+
+            foreach (var item in GClass3380.GetAllItems(container))
+            {
+                if (ReferenceEquals(item, container))
+                {
+                    continue;
+                }
+
+                if (match(item) && !output.Contains(item))
+                {
+                    output.Add(item);
+                }
+            }
+        }
+    }
+
+    private static void Log(string message)
     {
         if (AutoMedHotkeysPlugin.Debug.Value)
         {

@@ -10,7 +10,7 @@ public class AutoMedHotkeysPlugin : BaseUnityPlugin
 {
     public const string PluginGuid = "gadjed.automedhotkeys";
     public const string PluginName = "Auto Med Hotkeys";
-    public const string PluginVersion = "1.0.1";
+    public const string PluginVersion = "1.0.2";
 
     public static AutoMedHotkeysPlugin Instance { get; private set; } = null!;
     internal static ManualLogSource Log { get; private set; } = null!;
@@ -39,13 +39,15 @@ public class AutoMedHotkeysPlugin : BaseUnityPlugin
         Debug = Config.Bind(
             "1. General",
             "Debug",
-            false,
+            true,
             "Verbose logging of bind decisions."
         );
 
         new InventoryControllerCreatedPatch().Enable();
         new StashInventoryControllerCreatedPatch().Enable();
         new MainMenuInventoryReadyPatch().Enable();
+        new InventoryScreenShowPatch().Enable();
+        new MoveOperationRaiseEventsPatch().Enable();
         new InventoryAddItemPatch().Enable();
         new InventoryRemoveItemPatch().Enable();
 

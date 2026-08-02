@@ -11,6 +11,9 @@ internal static class InventoryOwnerUtil
     private static readonly FieldInfo? PlayerInventoryPlayerField =
         AccessTools.Field(typeof(Player.PlayerInventoryController), "Player_0");
 
+    private static readonly Type? MenuInventoryControllerBase =
+        AccessTools.TypeByName("GClass3387");
+
     /// <summary>
     /// True for the local PMC inventory in raid, or the main-menu/stash inventory controller.
     /// </summary>
@@ -26,17 +29,16 @@ internal static class InventoryOwnerUtil
             return false;
         }
 
-        // In-raid (and hideout player) inventory.
+        // In-raid local player inventory.
         if (controller is Player.PlayerInventoryController playerInventory)
         {
             var player = PlayerInventoryPlayerField?.GetValue(playerInventory) as Player;
             return player != null && player.IsYourPlayer;
         }
 
-        // Stash / character screen uses GClass3388 : GClass3387 : InventoryController
-        // (not PlayerInventoryController).
-        var menuBase = AccessTools.TypeByName("GClass3387");
-        if (menuBase != null && menuBase.IsInstanceOfType(controller))
+        // Stash / character screen: GClass3388 : GClass3387 : InventoryController
+        if (MenuInventoryControllerBase != null
+            && MenuInventoryControllerBase.IsInstanceOfType(controller))
         {
             return true;
         }
@@ -46,6 +48,7 @@ internal static class InventoryOwnerUtil
 
     public static bool IsObserved(InventoryController controller)
     {
-        return controller.GetType().FullName == "Fika.Core.Main.ObservedClasses.ObservedInventoryController";
+        return controller.GetType().FullName
+            == "Fika.Core.Main.ObservedClasses.ObservedInventoryController";
     }
 }
