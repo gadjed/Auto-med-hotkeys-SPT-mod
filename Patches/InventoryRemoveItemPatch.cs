@@ -1,13 +1,11 @@
 using System.Reflection;
-using EFT;
 using EFT.InventoryLogic;
 using SPT.Reflection.Patching;
 
 namespace AutoMedHotkeys.Patches;
 
 /// <summary>
-/// Re-evaluate hotkeys after an item leaves pockets/rig (e.g. moved into backpack).
-/// Vanilla clears the bind; when another matching item remains we rebind it.
+/// Re-evaluate hotkeys after an item leaves pockets/rig (e.g. moved into backpack/stash).
 /// </summary>
 internal class InventoryRemoveItemPatch : ModulePatch
 {
@@ -27,12 +25,12 @@ internal class InventoryRemoveItemPatch : ModulePatch
             return;
         }
 
-        if (__instance is not InventoryController controller)
+        if (!InventoryOwnerUtil.IsLocalPlayerInventory(__instance))
         {
             return;
         }
 
-        if (__instance is not Player.PlayerInventoryController)
+        if (__instance is not InventoryController controller)
         {
             return;
         }

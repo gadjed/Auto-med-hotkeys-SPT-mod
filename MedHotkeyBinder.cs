@@ -25,7 +25,9 @@ internal static class MedHotkeyBinder
 
     public static void RequestRefresh(InventoryController controller)
     {
-        if (!AutoMedHotkeysPlugin.Enabled.Value || controller == null || IsObserved(controller))
+        if (!AutoMedHotkeysPlugin.Enabled.Value
+            || controller == null
+            || InventoryOwnerUtil.IsObserved(controller))
         {
             return;
         }
@@ -65,7 +67,9 @@ internal static class MedHotkeyBinder
 
     public static void Refresh(InventoryController controller)
     {
-        if (!AutoMedHotkeysPlugin.Enabled.Value || controller == null || IsObserved(controller))
+        if (!AutoMedHotkeysPlugin.Enabled.Value
+            || controller == null
+            || InventoryOwnerUtil.IsObserved(controller))
         {
             return;
         }
@@ -150,11 +154,6 @@ internal static class MedHotkeyBinder
         }
 
         return best;
-    }
-
-    private static bool IsObserved(InventoryController controller)
-    {
-        return controller.GetType().FullName == "Fika.Core.Main.ObservedClasses.ObservedInventoryController";
     }
 
     private static void DebugLog(string message)

@@ -6,7 +6,7 @@ using SPT.Reflection.Patching;
 namespace AutoMedHotkeys.Patches;
 
 /// <summary>
-/// Re-evaluate hotkeys after an item is added to the player inventory (e.g. moved from backpack to rig).
+/// Re-evaluate hotkeys after an item is added (stash → pockets/rig, or in-raid moves).
 /// </summary>
 internal class InventoryAddItemPatch : ModulePatch
 {
@@ -26,13 +26,12 @@ internal class InventoryAddItemPatch : ModulePatch
             return;
         }
 
-        if (__instance is not InventoryController controller)
+        if (!InventoryOwnerUtil.IsLocalPlayerInventory(__instance))
         {
             return;
         }
 
-        // Only the local player inventory — never bot / loot controllers.
-        if (__instance is not Player.PlayerInventoryController)
+        if (__instance is not InventoryController controller)
         {
             return;
         }

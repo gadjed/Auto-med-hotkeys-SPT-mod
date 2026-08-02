@@ -2,7 +2,7 @@
 
 **SPT 4.0.13 only**
 
-Client mod that automatically binds medical items to quick-use slots **4 / 5 / 6** when they are in your **pockets** or **tactical rig**.
+Client mod that automatically binds medical items to quick-use slots **4 / 5 / 6** when they are in your **pockets** or **tactical rig** — both in the **stash** and in raid.
 
 [Latest release](https://github.com/gadjed/Auto-med-hotkeys-SPT-mod/releases/latest) · [License: MIT](LICENSE)
 
