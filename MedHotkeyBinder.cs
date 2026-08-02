@@ -101,7 +101,9 @@ internal static class MedHotkeyBinder
         var bound = controller.Inventory.FastAccess.GetBoundItem(slot);
         if (bound != null && match(bound) && controller.IsAtBindablePlace(bound))
         {
-            Log($"Slot {slot}: keep {bound.ShortName} ({label}).");
+            // Data already bound — still poke the UI so the badge appears in stash.
+            NotifyBindUi(controller, bound, slot);
+            Log($"Slot {slot}: keep {Describe(bound)} ({label}).");
             return;
         }
 
@@ -146,6 +148,9 @@ internal static class MedHotkeyBinder
             );
         }
 
+        // Extra UI poke — RaiseEvents already does this, but stash views can miss it.
+        NotifyBindUi(controller, candidate, slot);
+
         try
         {
             controller.TryRunNetworkTransaction(result, null);
@@ -158,8 +163,26 @@ internal static class MedHotkeyBinder
         }
 
         AutoMedHotkeysPlugin.Log.LogInfo(
-            $"[AutoMedHotkeys] Bound {candidate.ShortName} -> {slot} ({label})."
+            $"[AutoMedHotkeys] Bound {Describe(candidate)} -> {slot} ({label})."
         );
+    }
+
+    private static void NotifyBindUi(InventoryController controller, Item item, EBoundItem slot)
+    {
+        try
+        {
+            controller.RaiseBindItemEvent(new GEventArgs11(item, slot, CommandStatus.Begin, controller));
+            controller.RaiseBindItemEvent(new GEventArgs11(item, slot, CommandStatus.Succeed, controller));
+        }
+        catch (Exception ex)
+        {
+            Log($"NotifyBindUi failed: {ex.Message}");
+        }
+    }
+
+    private static string Describe(Item item)
+    {
+        return $"{item.TemplateId}#{item.Id}";
     }
 
     private static Item? FindBestCandidate(InventoryController controller, Predicate<Item> match)

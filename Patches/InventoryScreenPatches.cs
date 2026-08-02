@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using EFT.InventoryLogic;
 using EFT.UI;
@@ -13,7 +14,7 @@ internal class InventoryScreenShowPatch : ModulePatch
 {
     protected override MethodBase GetTargetMethod()
     {
-        // Show(IHealthController, InventoryController, AbstractQuestControllerClass, ...)
+        // Show(..., InventoryController controller, ...)
         foreach (var method in AccessTools.GetDeclaredMethods(typeof(InventoryScreen)))
         {
             if (method.Name != "Show")
@@ -28,19 +29,21 @@ internal class InventoryScreenShowPatch : ModulePatch
             }
         }
 
-        AutoMedHotkeysPlugin.Log.LogError("[AutoMedHotkeys] InventoryScreen.Show(InventoryController) not found.");
-        return typeof(object).GetMethod(nameof(ToString))!;
+        throw new InvalidOperationException(
+            "[AutoMedHotkeys] InventoryScreen.Show(InventoryController) not found."
+        );
     }
 
+    // Parameter name MUST match the game method ("controller"), or Harmony throws and aborts remaining patches.
     [PatchPostfix]
-    public static void Postfix(InventoryController inventoryController)
+    public static void Postfix(InventoryController controller)
     {
-        if (inventoryController == null)
+        if (controller == null)
         {
             return;
         }
 
-        MedHotkeyBinder.RequestRefresh(inventoryController);
+        MedHotkeyBinder.RequestRefresh(controller);
     }
 }
 

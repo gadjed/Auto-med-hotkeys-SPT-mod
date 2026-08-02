@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- Fix: `InventoryScreenShowPatch` crashed on load (wrong Harmony parameter name), which **skipped Add/Remove/Move patches**
+- Safe patch enabling so one failure cannot disable the rest
+- Force hotkey badge refresh on grid item views and when keeping existing binds
+
 ## 1.0.2
 
 - Fix: stash still had no binds because the client kept loading **1.0.0** (DLL locked while the game was open)
